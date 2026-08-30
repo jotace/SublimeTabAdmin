@@ -8,28 +8,85 @@ import datetime
 # TAB ADMIN PARA SUBLIME TEXT 3
 # ============================================================
 #
-# Este plugin administra las pestañas / buffers que todavía
-# NO han sido guardados como archivos físicos.
-#
-# IMPORTANTE:
-#
-# No dependemos del texto "Untitled".
+# Administra las pestañas que todavía NO han sido guardadas
+# como archivos físicos.
 #
 # Una pestaña sin guardar se identifica mediante:
 #
 #     view.file_name() is None
 #
-# Esto funciona incluso cuando Sublime cambia visualmente
-# "Untitled" por la primera línea escrita dentro del documento.
-#
-# Funciones actuales:
+# Funciones:
 #
 # 1. Listar todas las pestañas sin guardar.
 # 2. Mostrar una vista previa de su contenido.
 # 3. Saltar directamente a una pestaña seleccionada.
 # 4. Crear un respaldo de todas las pestañas sin guardar.
 # 5. Cerrar solamente pestañas vacías y no modificadas.
+# 6. Cerrar todas las pestañas sin guardar.
+# 7. Alertas automáticas configurables.
 #
+# ============================================================
+
+
+# ============================================================
+# CONFIGURACIÓN DEL PLUGIN
+# ============================================================
+
+SETTINGS_FILE = "TabAdmin.sublime-settings"
+
+
+def get_tab_admin_settings():
+    """
+    Carga la configuración de TabAdmin.
+    """
+
+    return sublime.load_settings(
+        SETTINGS_FILE
+    )
+
+
+def get_setting_integer(
+    setting_name,
+    default_value
+):
+    """
+    Obtiene una configuración numérica.
+
+    Si el valor no existe o no es válido,
+    devuelve el valor por defecto.
+    """
+
+    settings = get_tab_admin_settings()
+
+    value = settings.get(
+        setting_name,
+        default_value
+    )
+
+    try:
+        value = int(value)
+
+    except Exception:
+        value = default_value
+
+    return value
+
+
+def alerts_are_enabled():
+    """
+    Indica si las alertas automáticas están activadas.
+    """
+
+    settings = get_tab_admin_settings()
+
+    return settings.get(
+        "alerts_enabled",
+        True
+    )
+
+
+# ============================================================
+# FUNCIONES GENERALES
 # ============================================================
 
 
@@ -40,7 +97,7 @@ import datetime
 def is_unsaved_view(view):
     """
     Devuelve True si la pestaña todavía no tiene
-    un archivo físico asociado en disco.
+    un archivo físico asociado.
     """
 
     if view.file_name() is None:
@@ -55,9 +112,8 @@ def is_unsaved_view(view):
 
 def get_unsaved_views(window):
     """
-    Recorre todas las pestañas abiertas de la ventana actual
-    y devuelve solamente aquellas que todavía no han sido
-    guardadas como archivo.
+    Devuelve todas las pestañas de la ventana actual
+    que todavía no han sido guardadas como archivo.
     """
 
     unsaved_views = []
@@ -73,17 +129,14 @@ def get_unsaved_views(window):
 
 
 # ------------------------------------------------------------
-# OBTENER UN NOMBRE ÚTIL PARA MOSTRAR LA PESTAÑA
+# OBTENER NOMBRE VISIBLE DE LA PESTAÑA
 # ------------------------------------------------------------
 
 def get_view_title(view):
     """
     Obtiene el nombre visible de una pestaña.
 
-    Sublime puede utilizar la primera línea del contenido
-    como título de una pestaña sin guardar.
-
-    Si no existe ningún nombre, mostramos "Untitled".
+    Si no existe nombre, devuelve "Untitled".
     """
 
     title = view.name()
@@ -105,8 +158,8 @@ def get_view_title(view):
 
 def get_view_status(view):
     """
-    Indica si Sublime considera que la pestaña tiene
-    cambios pendientes.
+    Indica si Sublime considera que la pestaña
+    tiene modificaciones.
     """
 
     if view.is_dirty():
@@ -116,16 +169,15 @@ def get_view_status(view):
 
 
 # ------------------------------------------------------------
-# OBTENER VISTA PREVIA DEL CONTENIDO
+# OBTENER VISTA PREVIA
 # ------------------------------------------------------------
 
-def get_preview_text(view, limit=180):
+def get_preview_text(
+    view,
+    limit=180
+):
     """
-    Devuelve los primeros caracteres del documento para
-    mostrarlos en el panel de administración.
-
-    Los saltos de línea se convierten en espacios para
-    mantener la vista previa compacta.
+    Devuelve una vista previa del contenido.
     """
 
     size = view.size()
@@ -179,7 +231,7 @@ def get_preview_text(view, limit=180):
 
 
 # ------------------------------------------------------------
-# OBTENER TODO EL CONTENIDO DE UNA PESTAÑA
+# OBTENER CONTENIDO COMPLETO
 # ------------------------------------------------------------
 
 def get_full_view_content(view):
@@ -200,24 +252,18 @@ def get_full_view_content(view):
 
 
 # ------------------------------------------------------------
-# BUSCAR DIRECTORIO PARA GUARDAR RESPALDOS
+# DIRECTORIO PARA RESPALDOS
 # ------------------------------------------------------------
 
 def get_backup_directory():
     """
-    Intenta utilizar el Escritorio del usuario.
+    Busca un directorio apropiado para los respaldos.
 
-    Primero prueba:
+    Orden:
 
-        ~/Desktop
-
-    Luego:
-
-        ~/Escritorio
-
-    Si ninguno existe, utiliza:
-
-        Packages/User/TabAdmin_Backups
+    1. ~/Desktop
+    2. ~/Escritorio
+    3. Packages/User/TabAdmin_Backups
     """
 
     home_directory = os.path.expanduser(
@@ -225,7 +271,7 @@ def get_backup_directory():
     )
 
     # --------------------------------------------------------
-    # Intentar Desktop
+    # Desktop
     # --------------------------------------------------------
 
     desktop_directory = os.path.join(
@@ -237,7 +283,7 @@ def get_backup_directory():
         return desktop_directory
 
     # --------------------------------------------------------
-    # Intentar Escritorio
+    # Escritorio
     # --------------------------------------------------------
 
     desktop_directory = os.path.join(
@@ -249,7 +295,7 @@ def get_backup_directory():
         return desktop_directory
 
     # --------------------------------------------------------
-    # Directorio alternativo dentro de Sublime
+    # Directorio alternativo
     # --------------------------------------------------------
 
     backup_directory = os.path.join(
@@ -258,7 +304,9 @@ def get_backup_directory():
         "TabAdmin_Backups"
     )
 
-    if not os.path.isdir(backup_directory):
+    if not os.path.isdir(
+        backup_directory
+    ):
 
         os.makedirs(
             backup_directory
@@ -278,10 +326,6 @@ class ListUnsavedTabsCommand(
 ):
 
     def run(self):
-        """
-        Abre un Quick Panel mostrando solamente los
-        documentos que todavía no han sido guardados.
-        """
 
         self.unsaved_views = get_unsaved_views(
             self.window
@@ -291,10 +335,6 @@ class ListUnsavedTabsCommand(
             self.unsaved_views
         )
 
-        # ----------------------------------------------------
-        # No encontramos documentos sin guardar.
-        # ----------------------------------------------------
-
         if number_of_views == 0:
 
             sublime.message_dialog(
@@ -303,10 +343,6 @@ class ListUnsavedTabsCommand(
             )
 
             return
-
-        # ----------------------------------------------------
-        # Construir elementos del Quick Panel.
-        # ----------------------------------------------------
 
         items = []
 
@@ -348,23 +384,18 @@ class ListUnsavedTabsCommand(
 
             position = position + 1
 
-        # ----------------------------------------------------
-        # Mostrar panel.
-        # ----------------------------------------------------
-
         self.window.show_quick_panel(
             items,
             self.on_select
         )
 
 
-    def on_select(self, index):
-        """
-        Sublime llama esta función cuando seleccionamos
-        una pestaña del listado.
-        """
+    def on_select(
+        self,
+        index
+    ):
 
-        # -1 significa que el usuario canceló.
+        # El usuario canceló.
         if index == -1:
             return
 
@@ -372,7 +403,6 @@ class ListUnsavedTabsCommand(
             self.unsaved_views
         )
 
-        # Protección adicional.
         if index >= number_of_views:
             return
 
@@ -380,7 +410,6 @@ class ListUnsavedTabsCommand(
             index
         ]
 
-        # Llevar al usuario directamente a esa pestaña.
         self.window.focus_view(
             selected_view
         )
@@ -389,7 +418,7 @@ class ListUnsavedTabsCommand(
 # ============================================================
 # COMANDO 2
 #
-# CREAR RESPALDO DE TODAS LAS PESTAÑAS SIN GUARDAR
+# RESPALDAR TODAS LAS PESTAÑAS SIN GUARDAR
 # ============================================================
 
 class BackupUnsavedTabsCommand(
@@ -397,11 +426,6 @@ class BackupUnsavedTabsCommand(
 ):
 
     def run(self):
-        """
-        Guarda en un archivo TXT el contenido completo de
-        todas las pestañas que todavía no tienen archivo
-        físico asociado.
-        """
 
         unsaved_views = get_unsaved_views(
             self.window
@@ -410,10 +434,6 @@ class BackupUnsavedTabsCommand(
         number_of_views = len(
             unsaved_views
         )
-
-        # ----------------------------------------------------
-        # No tenemos nada que respaldar.
-        # ----------------------------------------------------
 
         if number_of_views == 0:
 
@@ -425,7 +445,7 @@ class BackupUnsavedTabsCommand(
             return
 
         # ----------------------------------------------------
-        # Crear fecha/hora para identificar el respaldo.
+        # Fecha y hora
         # ----------------------------------------------------
 
         current_time = datetime.datetime.now()
@@ -433,6 +453,10 @@ class BackupUnsavedTabsCommand(
         timestamp = current_time.strftime(
             "%Y-%m-%d_%H-%M-%S"
         )
+
+        # ----------------------------------------------------
+        # Archivo de respaldo
+        # ----------------------------------------------------
 
         backup_directory = get_backup_directory()
 
@@ -448,7 +472,7 @@ class BackupUnsavedTabsCommand(
         )
 
         # ----------------------------------------------------
-        # Construir contenido del respaldo.
+        # Crear contenido
         # ----------------------------------------------------
 
         content = []
@@ -461,9 +485,7 @@ class BackupUnsavedTabsCommand(
             "=" * 78
         )
 
-        content.append(
-            ""
-        )
+        content.append("")
 
         content.append(
             "Fecha: {}".format(
@@ -477,23 +499,11 @@ class BackupUnsavedTabsCommand(
             )
         )
 
-        content.append(
-            ""
-        )
-
-        content.append(
-            "=" * 78
-        )
-
-        content.append(
-            ""
-        )
+        content.append("")
+        content.append("=" * 78)
+        content.append("")
 
         position = 1
-
-        # ----------------------------------------------------
-        # Agregar cada pestaña al respaldo.
-        # ----------------------------------------------------
 
         for view in unsaved_views:
 
@@ -539,9 +549,7 @@ class BackupUnsavedTabsCommand(
                 )
             )
 
-            content.append(
-                ""
-            )
+            content.append("")
 
             content.append(
                 "CONTENIDO:"
@@ -555,49 +563,32 @@ class BackupUnsavedTabsCommand(
                 text
             )
 
-            content.append(
-                ""
-            )
-
-            content.append(
-                ""
-            )
-
-            content.append(
-                "=" * 78
-            )
-
-            content.append(
-                ""
-            )
+            content.append("")
+            content.append("")
+            content.append("=" * 78)
+            content.append("")
 
             position = position + 1
-
-        # ----------------------------------------------------
-        # Convertir lista a texto.
-        # ----------------------------------------------------
 
         final_content = "\n".join(
             content
         )
 
         # ----------------------------------------------------
-        # Guardar el archivo.
+        # Guardar
         # ----------------------------------------------------
 
         try:
 
-            backup_file = open(
+            with open(
                 output_file,
                 "w",
                 encoding="utf-8"
-            )
+            ) as backup_file:
 
-            backup_file.write(
-                final_content
-            )
-
-            backup_file.close()
+                backup_file.write(
+                    final_content
+                )
 
         except Exception as error:
 
@@ -615,7 +606,7 @@ class BackupUnsavedTabsCommand(
             return
 
         # ----------------------------------------------------
-        # Confirmación.
+        # Confirmación
         # ----------------------------------------------------
 
         message = (
@@ -635,7 +626,7 @@ class BackupUnsavedTabsCommand(
 # ============================================================
 # COMANDO 3
 #
-# CERRAR PESTAÑAS SIN GUARDAR COMPLETAMENTE VACÍAS
+# CERRAR PESTAÑAS SIN GUARDAR VACÍAS
 # ============================================================
 
 class CloseEmptyUnsavedTabsCommand(
@@ -643,18 +634,6 @@ class CloseEmptyUnsavedTabsCommand(
 ):
 
     def run(self):
-        """
-        Busca documentos sin guardar completamente vacíos.
-
-        Por seguridad, solamente cierra aquellos que:
-
-        1. No tienen archivo asociado.
-        2. Tienen 0 caracteres.
-        3. Sublime NO los considera modificados.
-
-        Si un documento está vacío pero aparece como modificado,
-        NO se cerrará automáticamente.
-        """
 
         unsaved_views = get_unsaved_views(
             self.window
@@ -665,7 +644,7 @@ class CloseEmptyUnsavedTabsCommand(
         skipped_dirty_empty_views = []
 
         # ----------------------------------------------------
-        # Clasificar documentos vacíos.
+        # Clasificar pestañas
         # ----------------------------------------------------
 
         for view in unsaved_views:
@@ -674,21 +653,11 @@ class CloseEmptyUnsavedTabsCommand(
 
             is_dirty = view.is_dirty()
 
-            # ------------------------------------------------
-            # Vacío y no modificado:
-            # seguro para cerrar.
-            # ------------------------------------------------
-
             if size == 0 and not is_dirty:
 
                 safe_empty_views.append(
                     view
                 )
-
-            # ------------------------------------------------
-            # Vacío pero Sublime dice que fue modificado:
-            # no lo cerramos automáticamente.
-            # ------------------------------------------------
 
             elif size == 0 and is_dirty:
 
@@ -705,7 +674,7 @@ class CloseEmptyUnsavedTabsCommand(
         )
 
         # ----------------------------------------------------
-        # Nada seguro para cerrar.
+        # Nada para cerrar
         # ----------------------------------------------------
 
         if number_of_safe_views == 0:
@@ -734,7 +703,7 @@ class CloseEmptyUnsavedTabsCommand(
             return
 
         # ----------------------------------------------------
-        # Confirmación antes de cerrar.
+        # Confirmación
         # ----------------------------------------------------
 
         message = (
@@ -766,17 +735,14 @@ class CloseEmptyUnsavedTabsCommand(
             return
 
         # ----------------------------------------------------
-        # Cerrar.
+        # Cerrar
         # ----------------------------------------------------
 
         closed_count = 0
 
         for view in safe_empty_views:
 
-            # ------------------------------------------------
-            # Comprobar nuevamente justo antes de cerrar.
-            # ------------------------------------------------
-
+            # Comprobar nuevamente.
             if view.size() != 0:
                 continue
 
@@ -793,10 +759,6 @@ class CloseEmptyUnsavedTabsCommand(
 
             closed_count = closed_count + 1
 
-        # ----------------------------------------------------
-        # Resultado.
-        # ----------------------------------------------------
-
         result_message = (
             "Se cerraron {} pestaña(s) "
             "vacía(s)."
@@ -807,7 +769,9 @@ class CloseEmptyUnsavedTabsCommand(
         sublime.message_dialog(
             result_message
         )
-        # ============================================================
+
+
+# ============================================================
 # COMANDO 4
 #
 # CERRAR TODAS LAS PESTAÑAS SIN GUARDAR
@@ -818,29 +782,6 @@ class CloseAllUnsavedTabsCommand(
 ):
 
     def run(self):
-        """
-        Cierra TODAS las pestañas que todavía no tienen
-        un archivo físico asociado.
-
-        Esto incluye:
-
-        - Pestañas vacías.
-        - Pestañas con contenido.
-        - Pestañas modificadas.
-        - Pestañas cuyo título ya no dice "Untitled".
-
-        IMPORTANTE:
-
-        El contenido de estas pestañas será descartado.
-
-        Para evitar que Sublime muestre un diálogo de
-        guardado por cada pestaña, antes de cerrarla
-        se convierte temporalmente en una vista scratch.
-        """
-
-        # ----------------------------------------------------
-        # Obtener todas las pestañas sin guardar.
-        # ----------------------------------------------------
 
         unsaved_views = get_unsaved_views(
             self.window
@@ -849,10 +790,6 @@ class CloseAllUnsavedTabsCommand(
         number_of_views = len(
             unsaved_views
         )
-
-        # ----------------------------------------------------
-        # No hay nada que cerrar.
-        # ----------------------------------------------------
 
         if number_of_views == 0:
 
@@ -864,7 +801,7 @@ class CloseAllUnsavedTabsCommand(
             return
 
         # ----------------------------------------------------
-        # Contar pestañas según su estado.
+        # Contar estados
         # ----------------------------------------------------
 
         empty_count = 0
@@ -875,6 +812,7 @@ class CloseAllUnsavedTabsCommand(
 
             if view.size() == 0:
                 empty_count = empty_count + 1
+
             else:
                 content_count = content_count + 1
 
@@ -882,7 +820,7 @@ class CloseAllUnsavedTabsCommand(
                 dirty_count = dirty_count + 1
 
         # ----------------------------------------------------
-        # Mostrar advertencia antes de hacer nada.
+        # Advertencia
         # ----------------------------------------------------
 
         message = (
@@ -910,15 +848,11 @@ class CloseAllUnsavedTabsCommand(
             "Cerrar TODAS"
         )
 
-        # ----------------------------------------------------
-        # El usuario canceló.
-        # ----------------------------------------------------
-
         if not confirm:
             return
 
         # ----------------------------------------------------
-        # Cerrar pestañas.
+        # Cerrar pestañas
         # ----------------------------------------------------
 
         closed_count = 0
@@ -926,41 +860,21 @@ class CloseAllUnsavedTabsCommand(
 
         for view in unsaved_views:
 
-            # ------------------------------------------------
-            # Comprobar nuevamente justo antes de cerrarla.
-            #
-            # Es importante porque una pestaña podría haber
-            # sido guardada mientras el comando estaba activo.
-            # ------------------------------------------------
-
+            # Puede haber sido guardada entretanto.
             if view.file_name() is not None:
 
                 skipped_count = skipped_count + 1
 
                 continue
 
-            # ------------------------------------------------
-            # Marcar como scratch.
-            #
-            # Esto permite descartarla sin que Sublime
-            # pregunte si queremos guardar los cambios.
-            # ------------------------------------------------
-
+            # Evitar diálogo individual de guardado.
             view.set_scratch(
                 True
             )
 
-            # ------------------------------------------------
-            # Dar foco a la pestaña que vamos a cerrar.
-            # ------------------------------------------------
-
             self.window.focus_view(
                 view
             )
-
-            # ------------------------------------------------
-            # Cerrar la pestaña enfocada.
-            # ------------------------------------------------
 
             self.window.run_command(
                 "close_file"
@@ -969,7 +883,7 @@ class CloseAllUnsavedTabsCommand(
             closed_count = closed_count + 1
 
         # ----------------------------------------------------
-        # Mostrar resultado.
+        # Resultado
         # ----------------------------------------------------
 
         result_message = (
@@ -994,49 +908,30 @@ class CloseAllUnsavedTabsCommand(
             result_message
         )
 
-        # ============================================================
+
+# ============================================================
 # SISTEMA AUTOMÁTICO DE ALERTAS
-# PARA PESTAÑAS SIN GUARDAR
 # ============================================================
 #
-# NIVELES:
+# Los niveles se obtienen desde:
 #
-#     10 pestañas  -> Aviso
-#     25 pestañas  -> Advertencia
-#     50 pestañas  -> Alerta importante
-#     100 pestañas -> Respaldo muy recomendado
+#     TabAdmin.sublime-settings
 #
-# En TODOS los niveles aparecen tres opciones:
+# Valores por defecto:
 #
-#     [ Crear respaldo ahora ]
-#     [ !!! CERRAR TODAS !!! ]
-#     [ Cancelar ]
+#     10  -> Aviso
+#     25  -> Advertencia
+#     50  -> Alerta importante
+#     100 -> Respaldo muy recomendado
 #
-# IMPORTANTE:
+# Cada alerta ofrece:
 #
-# - "Crear respaldo ahora" ejecuta backup_unsaved_tabs.
-# - "Cerrar todas" ejecuta close_all_unsaved_tabs.
-# - "Cancelar" no hace nada.
-#
-# El botón de cierre NO puede pintarse de rojo mediante
-# la API nativa de Sublime Text 3.
+#     Crear respaldo ahora
+#     !!! CERRAR TODAS !!!
+#     Cancelar
 #
 # ============================================================
 
-
-# ------------------------------------------------------------
-# CONFIGURACIÓN DE LOS NIVELES
-# ------------------------------------------------------------
-
-UNSAVED_LEVEL_INFO = 10
-UNSAVED_LEVEL_WARNING = 25
-UNSAVED_LEVEL_IMPORTANT = 50
-UNSAVED_LEVEL_CRITICAL = 100
-
-
-# ============================================================
-# LISTENER PRINCIPAL
-# ============================================================
 
 class UnsavedTabLimitAlertListener(
     sublime_plugin.EventListener
@@ -1045,33 +940,21 @@ class UnsavedTabLimitAlertListener(
     """
     Supervisa automáticamente la cantidad de pestañas
     sin guardar de cada ventana de Sublime Text.
-
-    Cada ventana mantiene su propio nivel de alerta.
     """
 
-    # --------------------------------------------------------
-    # Guarda el último nivel alcanzado por cada ventana.
-    #
-    # Ejemplo:
-    #
-    # {
-    #     1: 2,
-    #     3: 4
-    # }
-    #
-    # Ventana 1 -> nivel 25
-    # Ventana 3 -> nivel 100
-    # --------------------------------------------------------
-
+    # Nivel ya notificado por cada ventana.
     window_alert_levels = {}
 
 
     # ========================================================
     # EVENTO:
-    # CREACIÓN DE UNA NUEVA PESTAÑA
+    # NUEVA PESTAÑA
     # ========================================================
 
-    def on_new(self, view):
+    def on_new(
+        self,
+        view
+    ):
 
         window = view.window()
 
@@ -1086,10 +969,13 @@ class UnsavedTabLimitAlertListener(
 
     # ========================================================
     # EVENTO:
-    # UNA PESTAÑA ES GUARDADA
+    # PESTAÑA GUARDADA
     # ========================================================
 
-    def on_post_save(self, view):
+    def on_post_save(
+        self,
+        view
+    ):
 
         window = view.window()
 
@@ -1104,10 +990,13 @@ class UnsavedTabLimitAlertListener(
 
     # ========================================================
     # EVENTO:
-    # UNA PESTAÑA VA A CERRARSE
+    # PESTAÑA CERRADA
     # ========================================================
 
-    def on_pre_close(self, view):
+    def on_pre_close(
+        self,
+        view
+    ):
 
         window = view.window()
 
@@ -1121,7 +1010,7 @@ class UnsavedTabLimitAlertListener(
 
 
     # ========================================================
-    # CALCULAR NIVEL ACTUAL
+    # CALCULAR NIVEL DE ALERTA
     # ========================================================
 
     def get_alert_level(
@@ -1130,25 +1019,47 @@ class UnsavedTabLimitAlertListener(
     ):
 
         """
+        Determina el nivel según TabAdmin.sublime-settings.
+
         Devuelve:
 
-            0 = menos de 10
-            1 = 10 a 24
-            2 = 25 a 49
-            3 = 50 a 99
-            4 = 100 o más
+            0 = sin alerta
+            1 = aviso
+            2 = advertencia
+            3 = alerta importante
+            4 = alerta crítica
         """
 
-        if unsaved_count >= UNSAVED_LEVEL_CRITICAL:
+        info_level = get_setting_integer(
+            "alert_level_info",
+            10
+        )
+
+        warning_level = get_setting_integer(
+            "alert_level_warning",
+            25
+        )
+
+        important_level = get_setting_integer(
+            "alert_level_important",
+            50
+        )
+
+        critical_level = get_setting_integer(
+            "alert_level_critical",
+            100
+        )
+
+        if unsaved_count >= critical_level:
             return 4
 
-        if unsaved_count >= UNSAVED_LEVEL_IMPORTANT:
+        if unsaved_count >= important_level:
             return 3
 
-        if unsaved_count >= UNSAVED_LEVEL_WARNING:
+        if unsaved_count >= warning_level:
             return 2
 
-        if unsaved_count >= UNSAVED_LEVEL_INFO:
+        if unsaved_count >= info_level:
             return 1
 
         return 0
@@ -1167,7 +1078,14 @@ class UnsavedTabLimitAlertListener(
             return
 
         # ----------------------------------------------------
-        # Obtener todas las pestañas sin guardar.
+        # Alertas desactivadas
+        # ----------------------------------------------------
+
+        if not alerts_are_enabled():
+            return
+
+        # ----------------------------------------------------
+        # Contar pestañas sin guardar
         # ----------------------------------------------------
 
         unsaved_views = get_unsaved_views(
@@ -1178,29 +1096,20 @@ class UnsavedTabLimitAlertListener(
             unsaved_views
         )
 
-        # ----------------------------------------------------
-        # Determinar nivel actual.
-        # ----------------------------------------------------
-
         current_level = self.get_alert_level(
             unsaved_count
         )
 
         window_id = window.id()
 
-        # ----------------------------------------------------
-        # Nivel previamente registrado.
-        # ----------------------------------------------------
-
         previous_level = self.window_alert_levels.get(
             window_id,
             0
         )
 
-
-        # ====================================================
-        # SI BAJAMOS DE NIVEL
-        # ====================================================
+        # ----------------------------------------------------
+        # Bajamos de nivel
+        # ----------------------------------------------------
 
         if current_level < previous_level:
 
@@ -1210,18 +1119,16 @@ class UnsavedTabLimitAlertListener(
 
             return
 
-
-        # ====================================================
-        # SI SEGUIMOS EN EL MISMO NIVEL
-        # ====================================================
+        # ----------------------------------------------------
+        # Seguimos en el mismo nivel
+        # ----------------------------------------------------
 
         if current_level == previous_level:
             return
 
-
-        # ====================================================
-        # SI SUBIMOS DE NIVEL
-        # ====================================================
+        # ----------------------------------------------------
+        # Subimos de nivel
+        # ----------------------------------------------------
 
         self.window_alert_levels[
             window_id
@@ -1235,7 +1142,7 @@ class UnsavedTabLimitAlertListener(
 
 
     # ========================================================
-    # MOSTRAR DIÁLOGO CON TRES OPCIONES
+    # DIÁLOGO CON TRES OPCIONES
     # ========================================================
 
     def offer_actions(
@@ -1245,7 +1152,7 @@ class UnsavedTabLimitAlertListener(
     ):
 
         """
-        Presenta tres decisiones:
+        Opciones:
 
         YES:
             Crear respaldo ahora
@@ -1263,10 +1170,9 @@ class UnsavedTabLimitAlertListener(
             "!!! CERRAR TODAS !!!"
         )
 
-
-        # ====================================================
+        # ----------------------------------------------------
         # CREAR RESPALDO
-        # ====================================================
+        # ----------------------------------------------------
 
         if result == sublime.DIALOG_YES:
 
@@ -1276,19 +1182,11 @@ class UnsavedTabLimitAlertListener(
 
             return
 
-
-        # ====================================================
-        # CERRAR TODAS LAS PESTAÑAS SIN GUARDAR
-        # ====================================================
+        # ----------------------------------------------------
+        # CERRAR TODAS
+        # ----------------------------------------------------
 
         if result == sublime.DIALOG_NO:
-
-            # ------------------------------------------------
-            # Ejecutamos el comando que ya desarrollaste.
-            #
-            # Ese comando debe mantener su propia advertencia
-            # y confirmación antes de descartar contenido.
-            # ------------------------------------------------
 
             window.run_command(
                 "close_all_unsaved_tabs"
@@ -1296,17 +1194,16 @@ class UnsavedTabLimitAlertListener(
 
             return
 
-
-        # ====================================================
+        # ----------------------------------------------------
         # CANCELAR
-        # ====================================================
+        # ----------------------------------------------------
 
         if result == sublime.DIALOG_CANCEL:
             return
 
 
     # ========================================================
-    # MOSTRAR ALERTA SEGÚN NIVEL
+    # MOSTRAR ALERTA SEGÚN EL NIVEL
     # ========================================================
 
     def show_alert(
@@ -1317,40 +1214,58 @@ class UnsavedTabLimitAlertListener(
     ):
 
         """
-        Muestra una alerta distinta para cada nivel.
+        Muestra el mensaje correspondiente al nivel alcanzado.
 
-        Todas ofrecen:
-
-            Crear respaldo ahora
-            Cerrar todas
-            Cancelar
+        Los valores numéricos se leen dinámicamente desde
+        TabAdmin.sublime-settings.
         """
+
+        # ----------------------------------------------------
+        # Leer límites configurados
+        # ----------------------------------------------------
+
+        info_level = get_setting_integer(
+            "alert_level_info",
+            10
+        )
+
+        warning_level = get_setting_integer(
+            "alert_level_warning",
+            25
+        )
+
+        important_level = get_setting_integer(
+            "alert_level_important",
+            50
+        )
+
+        critical_level = get_setting_integer(
+            "alert_level_critical",
+            100
+        )
 
 
         # ====================================================
         # NIVEL 1
         #
-        # 10 PESTAÑAS
+        # AVISO
         # ====================================================
 
         if alert_level == 1:
 
             message = (
                 "TAB ADMIN - AVISO\n\n"
-
                 "Tienes {} pestañas sin guardar "
                 "en esta ventana.\n\n"
-
-                "Has alcanzado las 10 pestañas "
+                "Has alcanzado el nivel de {} pestañas "
                 "sin guardar.\n\n"
-
                 "Todavía es una cantidad manejable, "
                 "pero puedes crear un respaldo preventivo "
                 "o limpiar todas las pestañas temporales.\n\n"
-
                 "Selecciona una acción."
             ).format(
-                unsaved_count
+                unsaved_count,
+                info_level
             )
 
             self.offer_actions(
@@ -1364,28 +1279,25 @@ class UnsavedTabLimitAlertListener(
         # ====================================================
         # NIVEL 2
         #
-        # 25 PESTAÑAS
+        # ADVERTENCIA
         # ====================================================
 
         if alert_level == 2:
 
             message = (
                 "TAB ADMIN - ADVERTENCIA\n\n"
-
                 "Tienes {} pestañas sin guardar "
                 "en esta ventana.\n\n"
-
-                "Has alcanzado o superado "
-                "las 25 pestañas sin guardar.\n\n"
-
+                "Has alcanzado o superado el nivel "
+                "de {} pestañas sin guardar.\n\n"
                 "La cantidad de contenido temporal "
                 "está comenzando a crecer.\n\n"
-
                 "Puedes crear un respaldo, cerrar todas "
                 "las pestañas sin guardar o continuar "
                 "trabajando sin realizar ninguna acción."
             ).format(
-                unsaved_count
+                unsaved_count,
+                warning_level
             )
 
             self.offer_actions(
@@ -1399,31 +1311,27 @@ class UnsavedTabLimitAlertListener(
         # ====================================================
         # NIVEL 3
         #
-        # 50 PESTAÑAS
+        # ALERTA IMPORTANTE
         # ====================================================
 
         if alert_level == 3:
 
             message = (
                 "TAB ADMIN - ALERTA IMPORTANTE\n\n"
-
                 "Tienes {} pestañas sin guardar "
                 "en esta ventana.\n\n"
-
-                "Has alcanzado o superado "
-                "las 50 pestañas sin guardar.\n\n"
-
+                "Has alcanzado o superado el nivel "
+                "de {} pestañas sin guardar.\n\n"
                 "Existe un volumen considerable de "
                 "información temporal abierta.\n\n"
-
                 "Se recomienda crear un respaldo antes "
                 "de continuar acumulando pestañas.\n\n"
-
                 "También puedes cerrar todas las pestañas "
                 "sin guardar si ya no necesitas "
                 "su contenido."
             ).format(
-                unsaved_count
+                unsaved_count,
+                important_level
             )
 
             self.offer_actions(
@@ -1437,33 +1345,28 @@ class UnsavedTabLimitAlertListener(
         # ====================================================
         # NIVEL 4
         #
-        # 100 PESTAÑAS
+        # RESPALDO MUY RECOMENDADO
         # ====================================================
 
         if alert_level == 4:
 
             message = (
                 "TAB ADMIN - RESPALDO MUY RECOMENDADO\n\n"
-
                 "Tienes {} pestañas sin guardar "
                 "en esta ventana.\n\n"
-
-                "Has alcanzado o superado "
-                "las 100 pestañas sin guardar.\n\n"
-
+                "Has alcanzado o superado el nivel "
+                "de {} pestañas sin guardar.\n\n"
                 "Existe una cantidad importante de "
                 "información temporal abierta.\n\n"
-
                 "Una interrupción inesperada de Sublime, "
                 "Windows o del equipo podría poner "
                 "este contenido en riesgo.\n\n"
-
                 "RECOMENDACIÓN:\n\n"
-
                 "Crea un respaldo antes de cerrar "
                 "las pestañas sin guardar."
             ).format(
-                unsaved_count
+                unsaved_count,
+                critical_level
             )
 
             self.offer_actions(

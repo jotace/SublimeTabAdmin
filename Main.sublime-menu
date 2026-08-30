@@ -1,0 +1,31 @@
+[
+    {
+        "caption": "Preferences",
+        "mnemonic": "n",
+        "id": "preferences",
+        "children":
+        [
+            {
+                "caption": "Package Settings",
+                "id": "package-settings",
+                "children":
+                [
+                    {
+                        "caption": "TabAdmin",
+                        "children":
+                        [
+                            {
+                                "command": "open_file",
+                                "args":
+                                {
+                                    "file": "${packages}/TabAdmin/TabAdmin.sublime-settings"
+                                },
+                                "caption": "Settings"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+]

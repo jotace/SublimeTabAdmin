@@ -1,0 +1,20 @@
+{
+    // --------------------------------------------------------
+    // TAB ADMIN - CONFIGURACIÓN
+    // --------------------------------------------------------
+
+    // Activa o desactiva el sistema automático de alertas.
+    "alerts_enabled": true,
+
+    // Primer aviso.
+    "alert_level_info": 10,
+
+    // Advertencia.
+    "alert_level_warning": 25,
+
+    // Alerta importante.
+    "alert_level_important": 50,
+
+    // Respaldo muy recomendado.
+    "alert_level_critical": 100
+}
