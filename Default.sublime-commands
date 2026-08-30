@@ -1,0 +1,18 @@
+[
+    {
+        "caption": "Tab Admin: Listar pestañas sin guardar",
+        "command": "list_unsaved_tabs"
+    },
+    {
+        "caption": "Tab Admin: Respaldar pestañas sin guardar",
+        "command": "backup_unsaved_tabs"
+    },
+    {
+        "caption": "Tab Admin: Cerrar pestañas sin guardar vacías",
+        "command": "close_empty_unsaved_tabs"
+    },
+    {
+        "caption": "Tab Admin: Cerrar TODAS las pestañas sin guardar",
+        "command": "close_all_unsaved_tabs"
+    }
+]
